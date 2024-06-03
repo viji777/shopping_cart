@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Gabarito&display=swap');
+
+/* Apply Gabarito font family */
+.gabarito {
+  font-family: "Gabarito", sans-serif;
+}
+
+/* Optionally, you can specify font weight and style */
+.gabarito-bold {
+  font-weight: bold;
+}
+
+.gabarito-italic {
+  font-style: italic;
+}
+
