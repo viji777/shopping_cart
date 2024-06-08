@@ -15,6 +15,7 @@ function App() {
     axios.get('http://localhost:5000/carts')
       .then(response => {
         const cartsData = response.data.carts;
+        console.log(response)
         setTotalCarts(cartsData.length);
         setCarts(cartsData[cartNumber - 1]?.products || []);
         setLoading(false);

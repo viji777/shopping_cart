@@ -1,66 +1,97 @@
 const express = require('express');
-const fs = require('fs');
+const mongoose = require('mongoose');
 const path = require('path');
+const cors = require('cors');
 const app = express();
-const cors = require('cors'); 
 const port = 5000;
+
+mongoose.connect("mongodb+srv://viji:1212@cluster0.zavcg7u.mongodb.net/cart?retryWrites=true&w=majority&appName=Cluster0")
+  .then(() => {
+    console.log("DB Connected");
+  })
+  .catch((err) => {
+    console.log("Failed to connect DB", err);
+  });
 
 app.use(cors());
 app.use(express.json()); // Middleware to parse JSON request bodies
 
-
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Middleware to set Cache-Control headers for JSON responses
-app.use((req, res, next) => {
-  if (req.accepts('json')) {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  }
-  next();
+const productSchema = new mongoose.Schema({
+  id: Number,
+  title: String,
+  price: Number,
+  quantity: Number,
+  total: Number,
+  discountPercentage: Number,
+  discountedTotal: Number,
+  thumbnail: String
 });
 
-// GET endpoint to fetch cart data
-app.get('/carts', (req, res) => {
-  fs.readFile('carts.json', 'utf8', (err, data) => {
-    if (err) {
-      res.status(500).send('Error reading file');
-      return;
+const cartSchema = new mongoose.Schema({
+  id: Number,
+  products: [productSchema],
+  total: Number,
+  discountedTotal: Number,
+  userId: Number,
+  totalProducts: Number,
+  totalQuantity: Number
+});
+
+const mainSchema = new mongoose.Schema({
+ 
+  carts: [cartSchema],
+  total: Number,
+  skip: Number,
+  limit: Number
+}, { collection: 'shopping_cart' });
+
+const Main = mongoose.model('Main', mainSchema);
+console.log(Main);
+
+app.get('/carts', async (req, res) => {
+  try {
+    const result = await Main.find({});
+    if (result.length === 0) {
+      console.log('No carts found');
+      return res.status(404).json({ message: 'No carts found' });
     }
-    res.json(JSON.parse(data));
-  });
+    console.log('Fetched carts:', result);
+    res.json({ carts: result[0].carts }); // Adjusted to return the carts array
+  } catch (err) {
+    console.error('Error fetching carts from database:', err);
+    res.status(500).json({ error: 'Error fetching carts from database' });
+  }
 });
 
-// PUT endpoint to update cart data
-app.put('/carts/:id', (req, res) => {
+app.put('/carts/:id', async (req, res) => {
   const cartId = parseInt(req.params.id, 10);
   const updatedProducts = req.body.products;
 
-  fs.readFile('carts.json', 'utf8', (err, data) => {
-    if (err) {
-      res.status(500).send('Error reading file');
-      return;
+  if (!Array.isArray(updatedProducts)) {
+    return res.status(400).json({ error: 'Invalid products format' });
+  }
+
+  try {
+    let mainDocument = await Main.findOne({});
+    if (!mainDocument) {
+      mainDocument = new Main({ carts: [] });
     }
 
-    let cartsData = JSON.parse(data);
-    const cartIndex = cartsData.carts.findIndex(cart => cart.id === cartId);
+    let cart = mainDocument.carts.find(cart => cart.id === cartId);
 
-    if (cartIndex === -1) {
-      res.status(404).send('Cart not found');
-      return;
+    if (!cart) {
+      cart = { id: cartId, products: updatedProducts };
+      mainDocument.carts.push(cart);
+    } else {
+      cart.products = updatedProducts;
     }
 
-    cartsData.carts[cartIndex].products = updatedProducts;
-
-    fs.writeFile('carts.json', JSON.stringify(cartsData, null, 2), 'utf8', (err) => {
-      if (err) {
-        res.status(500).send('Error writing file');
-        return;
-      }
-
-      res.json(cartsData);
-    });
-  });
+    await mainDocument.save();
+    res.json(cart);
+  } catch (err) {
+    console.error('Error updating cart in database:', err);
+    res.status(500).json({ error: 'Error updating cart in database' });
+  }
 });
 
 app.listen(port, () => {
